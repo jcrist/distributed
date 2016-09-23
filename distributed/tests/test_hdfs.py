@@ -3,17 +3,15 @@ from __future__ import print_function, division, absolute_import
 import pytest
 from tornado import gen
 
-from dask.delayed import Delayed
+from dask.delayed import Delayed, delayed
 import dask.bag as db
 import dask.dataframe as dd
-from dask import compute, delayed
 
 from distributed.compatibility import unicode
-from distributed.utils_test import gen_cluster, cluster, make_hdfs
+from distributed.utils_test import gen_cluster, cluster, make_hdfs, loop
 from distributed.utils import get_ip
-from distributed.utils_test import loop
 from distributed import Client
-from distributed.client import _wait, Future
+from distributed.client import Future
 
 hdfs3 = pytest.importorskip('hdfs3')
 from distributed.hdfs import read_bytes, get_block_locations
@@ -39,10 +37,10 @@ def test_get_block_locations():
         with hdfs.open(fn_2, 'wb', replication=1) as f:
             f.write(data)
 
-        L =  get_block_locations(hdfs, '/tmp/test/')
+        L = get_block_locations(hdfs, '/tmp/test/')
         aa = get_block_locations(hdfs, fn_1)
         bb = get_block_locations(hdfs, fn_2)
-        assert (L == aa + bb) or (L == bb +  aa)
+        assert (L == aa + bb) or (L == bb + aa)
         assert L[0]['filename'] == L[1]['filename']
         assert L[2]['filename'] == L[3]['filename']
 
@@ -84,7 +82,7 @@ def test_get_block_locations_nested():
                 with hdfs.open(fn, 'wb', replication=1) as f:
                     f.write(data)
 
-        L =  get_block_locations(hdfs, '/tmp/test/')
+        L = get_block_locations(hdfs, '/tmp/test/')
         assert len(L) == 6
 
 
@@ -117,6 +115,26 @@ def test_read_bytes(e, s, a, b):
         assert s.restrictions
 
 
+@gen_cluster([(ip, 1), (ip, 2)], timeout=60, client=True)
+def test_read_bytes_sample_delimiter(e, s, a, b):
+    with make_hdfs() as hdfs:
+        data = (b'name,amount,id\n' +
+                (b'Alice,100,1\n'
+                 b'Bob,200,2\n') * int(1e8))
+        fn = '/tmp/test/file'
+
+        with hdfs.open(fn, 'wb', replication=1) as f:
+            f.write(data)
+
+        blocks = hdfs.get_block_locations(fn)
+        assert len(blocks) > 1
+
+        sample, values = read_bytes(fn, hdfs=hdfs, sample=80, delimiter=b'\n')
+        assert sample.endswith(b'\n')
+        sample, values = read_bytes(fn, hdfs=hdfs, sample=2, delimiter=b'\n')
+        assert sample.endswith(b'\n')
+
+
 def test_read_bytes_sync(loop):
     with cluster(nworkers=3) as (s, [a, b, c]):
         with make_hdfs() as hdfs:
@@ -145,7 +163,7 @@ def test_get_block_locations_nested_2(e, s, a, b):
                 with hdfs.open(fn, 'wb', replication=1) as f:
                     f.write(data)
 
-        L =  get_block_locations(hdfs, '/tmp/test/')
+        L = get_block_locations(hdfs, '/tmp/test/')
         assert len(L) == 6
 
         sample, values = read_bytes('/tmp/test/', hdfs=hdfs)
@@ -178,25 +196,6 @@ def test_lazy_values(e, s, a, b):
         results = yield e._gather(results)
         assert len(results) == 6
         assert all(x == b'a' for x in results)
-
-
-@gen_cluster([(ip, 1), (ip, 2)], timeout=60, client=True)
-def test_write_bytes(e, s, a, b):
-    with make_hdfs() as hdfs:
-        data = [b'123', b'456', b'789']
-        remote_data = yield e._scatter(data)
-
-        futures = write_bytes('/tmp/test/data/file.*.dat', remote_data, hdfs=hdfs)
-        yield _wait(futures)
-
-        assert len(hdfs.ls('/tmp/test/data/')) == 3
-        with hdfs.open('/tmp/test/data/file.1.dat') as f:
-            assert f.read() == b'456'
-
-        futures = write_bytes('/tmp/test/data2/', remote_data, hdfs=hdfs)
-        yield _wait(futures)
-
-        assert len(hdfs.ls('/tmp/test/data2/')) == 3
 
 
 def test_read_csv_sync(loop):
@@ -328,7 +327,6 @@ def test__read_text_json_endline(e, s, a):
         result = yield e.compute(b)._result()
 
         assert result == [{"x": 1}, {"x": 2}]
-
 
 
 @gen_cluster([(ip, 1), (ip, 1)], timeout=60, client=True)

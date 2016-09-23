@@ -97,8 +97,7 @@ def read_bytes(path, client=None, hdfs=None, lazy=True, delimiter=None,
     if sample is True:
         sample = 10000
     if sample:
-        with hdfs.open(filenames[0], 'rb') as f:
-            sample = f.read(sample)
+        sample = hdfs.read_block(filenames[0], 0, sample, delimiter)
     else:
         sample = b''
 
