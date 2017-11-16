@@ -25,11 +25,11 @@ matrix:
 before_install:
   - |
     if [[ $HDFS == true ]]; then
-        echo "dummy line"
-        echo "dummy line"
+        pushd continuous_integration
+        docker build -t distributed-hdfs-test .
         # Run HDFS
-        echo "dummy line"
-        echo "dummy line"
+        ./run-hdfs.sh || exit 1
+        popd
     fi;
 
 install:
