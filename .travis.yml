@@ -9,8 +9,6 @@ env:
     - PYTHON=2.7 PACKAGES="python-blosc futures faulthandler"
     - PYTHON=3.5.4 COVERAGE=true PACKAGES=python-blosc CRICK=true
     - PYTHON=3.6
-    - HDFS=true PYTHON=2.7
-    - HDFS=true PYTHON=3.5.4 PACKAGES=python-blosc
 
 matrix:
   fast_finish: true
