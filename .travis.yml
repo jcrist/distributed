@@ -22,12 +22,6 @@ matrix:
     # This needs to be the exact same line as above
     env: PYTHON=3.6 RUNSLOW=false
 
-addons:
-  hosts:
-    # Need to make the container's hostname resolvable, since the HDFS
-    # client will contact it back.
-    - hdfs-container
-
 before_install:
   - |
     if [[ $HDFS == true ]]; then
