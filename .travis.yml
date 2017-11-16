@@ -26,6 +26,10 @@ before_install:
   - |
     if [[ $HDFS == true ]]; then
         echo "dummy line"
+        echo "dummy line"
+        # Run HDFS
+        echo "dummy line"
+        echo "dummy line"
     fi;
 
 install:
